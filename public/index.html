@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Expense Analytics</title>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
+</head>
+<body>
+<div class="page">
+
+  <!-- Header -->
+  <div class="header">
+    <div class="header-left">
+      <h1>Analytics</h1>
+      <p>EXPENSE INTELLIGENCE DASHBOARD</p>
+    </div>
+    <div class="period-badge">MAY 2026</div>
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="summary-grid">
+    <div class="summary-card c1">
+      <div class="card-label">Total Transactions</div>
+      <div class="card-value neutral" id="totalCount">—</div>
+      <div class="card-sub">All time</div>
+    </div>
+    <div class="summary-card c2">
+      <div class="card-label">Total Debited</div>
+      <div class="card-value debit" id="totalDebited">—</div>
+      <div class="card-sub" id="countDebited">— transactions</div>
+    </div>
+    <div class="summary-card c3">
+      <div class="card-label">Total Credited</div>
+      <div class="card-value credit" id="totalCredited">—</div>
+      <div class="card-sub" id="countCredited">— transactions</div>
+    </div>
+    <div class="summary-card c4">
+      <div class="card-label">Net Balance</div>
+      <div class="card-value accent" id="netBalance">—</div>
+      <div class="card-sub" id="netMsg">—</div>
+    </div>
+  </div>
+
+  <!-- Main Grid: Bar Chart + Donut -->
+  <div class="main-grid">
+
+    <!-- Bar Chart -->
+    <div class="panel" style="animation-delay:0.25s">
+      <div class="panel-title"><span style="background:var(--accent)"></span>Weekly Spending</div>
+      <div class="bar-chart" id="barChart"></div>
+      <div class="chart-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:var(--debit)"></div>Debited</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--credit)"></div>Credited</div>
+      </div>
+    </div>
+
+    <!-- Donut + Categories -->
+    <div class="panel" style="animation-delay:0.3s">
+      <div class="panel-title"><span style="background:var(--accent2)"></span>By Category</div>
+      <div class="donut-wrap">
+        <svg width="160" height="160" viewBox="0 0 160 160">
+          <circle cx="80" cy="80" r="60" fill="none" stroke="var(--border)" stroke-width="20"/>
+          <g id="donutSegments"></g>
+        </svg>
+        <div class="donut-center">
+          <div class="donut-center-val" id="donutTotal">—</div>
+          <div class="donut-center-label">SPENT</div>
+        </div>
+      </div>
+      <div class="category-list" id="categoryList"></div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Grid: Transactions + Insights -->
+  <div class="bottom-grid">
+
+    <!-- Recent Transactions -->
+    <div class="panel" style="animation-delay:0.35s">
+      <div class="panel-title"><span style="background:var(--accent3)"></span>Recent Transactions</div>
+      <div class="txn-list" id="txnList"></div>
+    </div>
+
+    <!-- AI Insights -->
+    <div class="panel" style="animation-delay:0.4s">
+      <div class="panel-title"><span style="background:var(--accent4)"></span>Smart Insights</div>
+      <div class="insight-list" id="insightList"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  // ── Color palette for categories ──
+  const CATEGORY_COLORS = {
+    Shopping:      '#7c6dfa',
+    Transfer:      '#fa6d8e',
+    Food:          '#6dfabc',
+    Health:        '#fac96d',
+    Utilities:     '#6db8fa',
+    Transport:     '#fa9f6d',
+    Entertainment: '#d16dfa',
+    Education:     '#6dfaf0',
+    Other:         '#a0a0b0',
+  };
+
+  const CATEGORY_ICONS = {
+    Food: '🍔', Shopping: '🛒', Transport: '🚗', Utilities: '⚡',
+    Health: '💊', Entertainment: '🎬', Education: '📚', Transfer: '🏦', Other: '💳',
+  };
+
+  const CATEGORY_BG = {
+    Food: '#2a1a1a', Shopping: '#1a1a2a', Transport: '#1a1a2a', Utilities: '#2a2a1a',
+    Health: '#1a2a22', Entertainment: '#2a1a2a', Education: '#1a2a2a', Transfer: '#1a2a1a', Other: '#1a1a1a',
+  };
+
+  function colorFor(name) { return CATEGORY_COLORS[name] || '#a0a0b0'; }
+  function fmt(n) { return '₹' + Number(n).toLocaleString(); }
+
+  // ── Bar Chart ──
+  function buildBarChart(weeklyData) {
+    const el = document.getElementById('barChart');
+    el.innerHTML = '';
+    if (!weeklyData?.length) {
+      el.innerHTML = '<p style="color:var(--muted);font-size:0.75rem">No weekly data</p>';
+      return;
+    }
+    const chartH = 160;
+    const maxVal = Math.max(...weeklyData.map(d => Math.max(d.debit || 0, d.credit || 0)));
+    weeklyData.forEach(d => {
+      const dH = maxVal ? Math.round(((d.debit  || 0) / maxVal) * chartH) : 0;
+      const cH = maxVal ? Math.round(((d.credit || 0) / maxVal) * chartH) : 0;
+      el.innerHTML += `
+        <div class="bar-group">
+          <div class="bars">
+            <div class="bar debit-bar"  style="height:${dH}px"                    title="Debit ${fmt(d.debit   || 0)}"></div>
+            <div class="bar credit-bar" style="height:${Math.min(cH, chartH)}px"  title="Credit ${fmt(d.credit || 0)}"></div>
+          </div>
+          <div class="bar-label">${d.week}</div>
+        </div>`;
+    });
+  }
+
+  // ── Donut Chart ──
+  function buildDonut(categories) {
+    const seg = document.getElementById('donutSegments');
+    const donutTotal = document.getElementById('donutTotal');
+    seg.innerHTML = '';
+    if (!categories?.length) return;
+
+    const total = categories.reduce((s, c) => s + Math.abs(c.total || c.amount || 0), 0);
+    donutTotal.innerText = total >= 1000
+      ? '₹' + (total / 1000).toFixed(1) + 'k'
+      : fmt(total);
+
+    const circumference = 2 * Math.PI * 60;
+    let offset = 0;
+    categories.forEach(cat => {
+      const amt   = Math.abs(cat.total || cat.amount || 0);
+      const pct   = total ? (amt / total) * 100 : 0;
+      const dash  = (pct / 100) * circumference;
+      const color = colorFor(cat._id || cat.name);
+      seg.innerHTML += `<circle cx="80" cy="80" r="60" fill="none"
+        stroke="${color}" stroke-width="20"
+        stroke-dasharray="${dash} ${circumference - dash}"
+        stroke-dashoffset="${-offset}"
+        style="transition:stroke-dashoffset 0.5s ease"/>`;
+      offset += dash;
+    });
+  }
+
+  // ── Category List ──
+  function buildCategoryList(categories) {
+    const el = document.getElementById('categoryList');
+    el.innerHTML = '';
+    if (!categories?.length) {
+      el.innerHTML = '<p style="color:var(--muted);font-size:0.75rem">No data</p>';
+      return;
+    }
+    const max = Math.max(...categories.map(c => Math.abs(c.total || c.amount || 0)));
+    categories.slice(0, 6).forEach(cat => {
+      const amt   = Math.abs(cat.total || cat.amount || 0);
+      const pct   = max ? Math.round((amt / max) * 100) : 0;
+      const name  = cat._id || cat.name || 'Other';
+      const color = colorFor(name);
+      el.innerHTML += `
+        <div class="category-row">
+          <div class="cat-dot" style="background:${color}"></div>
+          <div class="cat-name">${name}</div>
+          <div class="cat-bar-wrap"><div class="cat-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <div class="cat-amt">${fmt(amt)}</div>
+        </div>`;
+    });
+  }
+
+  // ── Transaction List ──
+  function buildTransactions(txns) {
+    const el = document.getElementById('txnList');
+    el.innerHTML = '';
+    if (!txns?.length) {
+      el.innerHTML = '<p style="color:var(--muted);font-size:0.75rem">No transactions</p>';
+      return;
+    }
+    txns.slice(0, 8).forEach(t => {
+      const sign  = t.type === 'credit' ? '+' : '-';
+      const icon  = CATEGORY_ICONS[t.category] || '💳';
+      const bg    = CATEGORY_BG[t.category]    || '#1a1a1a';
+      el.innerHTML += `
+        <div class="txn-row">
+          <div class="txn-icon" style="background:${bg}">${icon}</div>
+          <div class="txn-info">
+            <div class="txn-name">${t.sender || t.category || 'Transaction'}</div>
+            <div class="txn-cat">${t.category || ''}</div>
+          </div>
+          <div class="txn-amt ${t.type}">${sign}${fmt(Math.abs(t.amount || 0))}</div>
+        </div>`;
+    });
+  }
+
+  // ── Insights ──
+  function buildInsights(insJson, totals, categories) {
+    const el = document.getElementById('insightList');
+    el.innerHTML = '';
+
+    // Use Claude AI insight if available
+    if (insJson.ai?.message) {
+      el.innerHTML = `
+        <div class="insight-card">
+          <div class="insight-icon">🤖</div>
+          <div class="insight-text">${insJson.ai.message}</div>
+        </div>`;
+      return;
+    }
+
+    // Auto-generate insights from live data
+    const debit  = totals.totalDebit  || 0;
+    const credit = totals.totalCredit || 0;
+    const net    = credit - debit;
+    const savingsRate = credit > 0 ? Math.round((net / credit) * 100) : 0;
+    const insights = [];
+
+    if (categories?.length) {
+      const top = categories.reduce((a, b) =>
+        Math.abs(a.total || a.amount || 0) > Math.abs(b.total || b.amount || 0) ? a : b
+      );
+      const topName = top._id || top.name || 'Unknown';
+      const topAmt  = Math.abs(top.total || top.amount || 0);
+      insights.push({ icon: '⚠️', text: `<strong>${topName}</strong> is your top expense at ${fmt(topAmt)}.` });
+    }
+
+    if (net >= 0) {
+      insights.push({ icon: '✅', text: `Great! You saved <strong>${fmt(net)}</strong> — a ${savingsRate}% savings rate.` });
+    } else {
+      insights.push({ icon: '🔴', text: `You overspent by <strong>${fmt(Math.abs(net))}</strong> this month.` });
+    }
+
+    if (debit  > 0) insights.push({ icon: '📊', text: `Total debited: <strong>${fmt(debit)}</strong>.` });
+    if (credit > 0) insights.push({ icon: '💰', text: `Total credited: <strong>${fmt(credit)}</strong>.` });
+
+    insights.forEach(ins => {
+      el.innerHTML += `
+        <div class="insight-card">
+          <div class="insight-icon">${ins.icon}</div>
+          <div class="insight-text">${ins.text}</div>
+        </div>`;
+    });
+  }
+
+  // ── Group transactions into weeks ──
+  function groupByWeek(transactions) {
+    const weeks = {
+      W1: { week: 'W1', debit: 0, credit: 0 },
+      W2: { week: 'W2', debit: 0, credit: 0 },
+      W3: { week: 'W3', debit: 0, credit: 0 },
+      W4: { week: 'W4', debit: 0, credit: 0 },
+    };
+    transactions.forEach(t => {
+      const raw = t.date || '';
+      const day = raw ? parseInt(raw.split(/[-/]/)[0]) : new Date(t.createdAt).getDate();
+      const key = day <= 7 ? 'W1' : day <= 14 ? 'W2' : day <= 21 ? 'W3' : 'W4';
+      if (t.type === 'debit')  weeks[key].debit  += t.amount || 0;
+      if (t.type === 'credit') weeks[key].credit += t.amount || 0;
+    });
+    return Object.values(weeks);
+  }
+
+  // ── Main loader ──
+  async function loadAnalytics() {
+    try {
+      const [insRes, txRes] = await Promise.all([
+        fetch('/api/insights'),
+        fetch('/api/transactions'),
+      ]);
+
+      const insJson = await insRes.json();
+      const txJson  = await txRes.json();
+
+      const transactions              = txJson.data || [];
+      const { totalCount, totals = {}, byCategory = [], bySpendCategory = [] } = insJson.success ? insJson : {};
+
+      // ── Summary Cards ──
+      document.getElementById('totalCount').innerText    = totalCount ?? transactions.length;
+      document.getElementById('totalDebited').innerText  = fmt(totals.totalDebit  || 0);
+      document.getElementById('totalCredited').innerText = fmt(totals.totalCredit || 0);
+      document.getElementById('countDebited').innerText  = `${totals.debitCount  || 0} transactions`;
+      document.getElementById('countCredited').innerText = `${totals.creditCount || 0} transactions`;
+
+      const net = (totals.totalCredit || 0) - (totals.totalDebit || 0);
+      document.getElementById('netBalance').innerText = fmt(net);
+      document.getElementById('netMsg').innerText     = net >= 0 ? '↑ positive' : '↓ negative';
+
+      // ── Use bySpendCategory for charts if available, else byCategory ──
+      const catData = bySpendCategory.length ? bySpendCategory : byCategory;
+
+      buildBarChart(groupByWeek(transactions));
+      buildDonut(catData);
+      buildCategoryList(catData);
+      buildTransactions(transactions);
+      buildInsights(insJson, totals, catData);
+
+    } catch (err) {
+      console.error('Analytics load error:', err);
+    }
+  }
+
+  loadAnalytics();
+</script>
+</body>
+</html>

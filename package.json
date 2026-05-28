@@ -1,0 +1,22 @@
+{
+  "name": "money-tracker",
+  "version": "1.0.0",
+  "description": "AI-powered expense tracker that reads SMS transaction alerts, detects debit/credit entries, auto-categorizes spending, and provides smart financial insights and analytics.",
+  "license": "ISC",
+  "author": "zubair",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "mongoose": "^9.6.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
