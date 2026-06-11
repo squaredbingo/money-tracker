@@ -1,113 +1,126 @@
-/**
- * Keyword map for auto-categorizing transactions
- * Add more keywords as needed
- */
 const CATEGORY_KEYWORDS = {
-  Food: ["swiggy", "zomato", "restaurant", "cafe", "food", "pizza", "burger", "dining"],
-  Shopping: ["amazon", "flipkart", "myntra", "meesho", "shop", "store", "mall"],
-  Transport: ["uber", "ola", "rapido", "metro", "fuel", "petrol", "diesel", "irctc", "train", "flight"],
-  Utilities: ["electricity", "water", "gas", "bill", "recharge", "broadband", "wifi", "internet"],
-  Health: ["pharmacy", "hospital", "clinic", "apollo", "medplus", "doctor", "medicine"],
-  Entertainment: ["netflix", "spotify", "prime", "hotstar", "youtube", "bookmyshow", "cinema"],
-  Education: ["udemy", "coursera", "college", "school", "fee", "tuition"],
-  Transfer: ["upi", "neft", "imps", "rtgs", "transfer", "sent to", "received from"],
+  Food: ['swiggy', 'zomato', 'restaurant', 'cafe', 'food', 'pizza', 'burger', 'dining', 'dominos', 'mcdonalds'],
+  Shopping: ['amazon', 'flipkart', 'myntra', 'meesho', 'shop', 'store', 'mall', 'nykaa', 'croma', 'big bazaar'],
+  Transport: ['uber', 'ola', 'rapido', 'metro', 'fuel', 'petrol', 'diesel', 'irctc', 'train', 'flight', 'airtel', 'indiGo'],
+  Utilities: ['electricity', 'water', 'gas', 'bill', 'recharge', 'broadband', 'wifi', 'internet', 'postpaid'],
+  Health: ['pharmacy', 'hospital', 'clinic', 'apollo', 'medplus', 'doctor', 'medicine', 'pharma'],
+  Entertainment: ['netflix', 'spotify', 'prime', 'hotstar', 'youtube', 'bookmyshow', 'cinema', 'movie'],
+  Education: ['udemy', 'coursera', 'college', 'school', 'fee', 'tuition'],
+  Transfer: ['upi', 'neft', 'imps', 'rtgs', 'transfer', 'sent to', 'received from', 'credited', 'deposited'],
 };
 
-/**
- * Detects whether the SMS is a credit or debit transaction
- * @param {string} text - Lowercased SMS message
- * @returns {'credit' | 'debit' | 'unknown'}
- */
+const AMOUNT_PATTERNS = [
+  /(?:debited\s+with|credited\s+with|deducted\s+from|paid\s+at|paid\s+for|spent\s+at|paid\s+to|charged\s+to|paid\s+on|payment\s+of)\s*(?:rs\.?\s?|inr\s?|₹\s*)?([\d,]+(?:\.\d{1,2})?)/i,
+  /(?:rs\.?\s?|inr\s?|₹\s*)([\d,]+(?:\.\d{1,2})?)/i,
+];
+
+const BALANCE_PATTERNS = [
+  /(?:available\s+balance|available\s+bal(?:ance)?|avl\.?\s*bal(?:ance)?|balance|bal)[:\s]*?(?:rs\.?\s?|inr\s?|₹\s*)?([\d,]+(?:\.\d{1,2})?)/i,
+];
+
+const DATE_PATTERNS = [
+  /\b(\d{1,2}[-/]\d{1,2}[-/]\d{2,4})\b/, // 23-05-2026 / 23/05/2026
+  /\b(\d{1,2}[-/](?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*[-/]\d{2,4})\b/i, // 23-May-2026
+  /\b((?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+\d{1,2},?\s+\d{4})\b/i,
+];
+
+function normalizeNumber(value) {
+  if (!value) return null;
+  return parseFloat(value.replace(/[\s,]/g, ''));
+}
+
 function detectType(text) {
-  const creditPatterns = /\b(credited|credit|received|deposited|refund|cashback|added)\b/;
-  const debitPatterns = /\b(debited|debit|spent|paid|payment|withdrawn|deducted|charged)\b/;
-
-  if (creditPatterns.test(text)) return "credit";
-  if (debitPatterns.test(text)) return "debit";
-  return "unknown";
+  const creditPatterns = /\b(?:credited|credit|received|deposited|refund|cashback|added)\b/;
+  const debitPatterns = /\b(?:debited|debit|spent|paid|payment|withdrawn|deducted|charged)\b/;
+  if (creditPatterns.test(text)) return 'credit';
+  if (debitPatterns.test(text)) return 'debit';
+  return 'unknown';
 }
 
-/**
- * Extracts the transaction amount from the SMS
- * Handles formats: Rs.1500, Rs 1,500.00, INR 1500, ₹1500
- * @param {string} text - Original SMS message
- * @returns {number | null}
- */
 function extractAmount(text) {
-  const match = text.match(/(?:rs\.?\s?|inr\s?|₹\s?)([\d,]+(?:\.\d{1,2})?)/i);
-  if (!match) return null;
-  return parseFloat(match[1].replace(/,/g, ""));
-}
-
-/**
- * Extracts the available balance from the SMS
- * @param {string} text - Original SMS message
- * @returns {number | null}
- */
-function extractBalance(text) {
-  const match = text.match(
-    /(?:balance|bal|avl\.?\s?bal)[:\s]+(?:rs\.?\s?|inr\s?|₹\s?)?([\d,]+(?:\.\d{1,2})?)/i
-  );
-  if (!match) return null;
-  return parseFloat(match[1].replace(/,/g, ""));
-}
-
-/**
- * Extracts the last few digits of the account/card number
- * @param {string} text - Original SMS message
- * @returns {string | null}
- */
-function extractAccount(text) {
-  const match = text.match(/(?:a\/c|account|ac|card)[^\d]*[xX*]+(\d{4})/i);
-  if (!match) {
-    // fallback: look for standalone masked pattern like XX1234
-    const fallback = text.match(/[xX*]{2,}(\d{3,4})/);
-    return fallback ? fallback[1] : null;
+  for (const pattern of AMOUNT_PATTERNS) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      return normalizeNumber(match[1]);
+    }
   }
-  return match[1];
+
+  const general = text.match(/(?:rs\.?\s?|inr\s?|₹\s*)([\d,]+(?:\.\d{1,2})?)/i);
+  return general ? normalizeNumber(general[1]) : null;
 }
 
-/**
- * Extracts date from the SMS if present
- * Handles: DD-Mon-YYYY, DD/MM/YYYY, DD-MM-YYYY
- * @param {string} text - Original SMS message
- * @returns {string | null}
- */
+function extractBalance(text) {
+  for (const pattern of BALANCE_PATTERNS) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      return normalizeNumber(match[1]);
+    }
+  }
+  return null;
+}
+
+function extractAccount(text) {
+  const accountPattern = /(?:a\/c|account|ac|card)[^\d]*[xX*]+(\d{3,4})/i;
+  const match = text.match(accountPattern);
+  if (match && match[1]) return match[1];
+
+  const fallback = text.match(/[xX*]{2,}(\d{3,4})/);
+  return fallback ? fallback[1] : null;
+}
+
 function extractDate(text) {
-  const match = text.match(
-    /\b(\d{1,2}[-/]\w{2,9}[-/]\d{2,4}|\d{1,2}[-/]\d{1,2}[-/]\d{2,4})\b/
-  );
-  return match ? match[1] : null;
+  for (const pattern of DATE_PATTERNS) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      const parsed = new Date(match[1].replace(/-/g, ' ').replace(/\b(\d{1,2})\b/g, '$1'));
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed;
+      }
+    }
+  }
+  return null;
 }
 
-/**
- * Auto-categorizes a transaction based on keywords in the SMS
- * @param {string} text - Lowercased SMS message
- * @returns {string}
- */
-function categorize(text) {
+function extractMerchant(text) {
+  const merchantPatterns = [
+    /(?:at|for|to|from)\s+([A-Za-z0-9 &().'-]{3,40})(?:\s+on|\s+from|\.|,|$)/i,
+    /(?:payment\s+for|for)\s+([A-Za-z0-9 &().'-]{3,40})(?:\s+on|\s+from|\.|,|$)/i,
+  ];
+
+  for (const pattern of merchantPatterns) {
+    const match = text.match(pattern);
+    if (match && match[1]) {
+      const merchant = match[1].trim();
+      if (!/account|a\/c|balance|avl|credited|debited/i.test(merchant)) {
+        return merchant;
+      }
+    }
+  }
+
+  return null;
+}
+
+function categorize(text, merchant) {
+  const searchText = `${text} ${merchant || ''}`;
   for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (keywords.some((kw) => text.includes(kw))) {
+    if (keywords.some((keyword) => searchText.includes(keyword))) {
       return category;
     }
   }
-  return "Other";
+  return 'Other';
 }
 
-/**
- * Main parser — takes a raw SMS object and returns structured transaction data
- * @param {{ id: number, sender: string, message: string }} sms
- * @returns {Object} Parsed transaction
- */
 function parseSMS(sms) {
-  const lowerText = sms.message.toLowerCase();
+  const text = sms.message || '';
+  const lowerText = text.toLowerCase();
 
   const type = detectType(lowerText);
-  const amount = extractAmount(sms.message);
-  const balance = extractBalance(sms.message);
-  const account = extractAccount(sms.message);
-  const date = extractDate(sms.message);
-  const category = categorize(lowerText);
+  const amount = extractAmount(text);
+  const balance = extractBalance(text);
+  const account = extractAccount(text);
+  const transactionDate = extractDate(text);
+  const merchant = extractMerchant(text);
+  const category = categorize(lowerText, merchant);
 
   return {
     id: sms.id,
@@ -116,10 +129,11 @@ function parseSMS(sms) {
     amount,
     balance,
     account,
-    date,
+    date: transactionDate,
+    merchant,
     category,
-    original: sms.message,
-    parsedAt: new Date().toISOString(),
+    original: text,
+    parsedAt: new Date(),
   };
 }
 

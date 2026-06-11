@@ -15,7 +15,9 @@ AI-powered expense analytics for SMS banking messages, built with Node.js, Expre
 - `POST /api/sms` — receive and store a single SMS transaction.
 - `POST /api/sms/bulk` — receive and store multiple SMS transactions.
 - `POST /api/sms/seed` — seed the database from sample SMS data.
-- `GET /api/transactions` — list all stored transactions.
+- `GET /api/sms` — list saved SMS transactions with optional query filters.
+- `POST /api/transactions` — create a transaction record directly or from raw SMS content.
+- `GET /api/transactions` — list stored transactions with paging and filters.
 - `GET /api/transactions/:id` — retrieve a specific transaction.
 - `PUT /api/transactions/:id` — update a stored transaction.
 - `DELETE /api/transactions/:id` — remove a transaction.
@@ -56,13 +58,20 @@ AI-powered expense analytics for SMS banking messages, built with Node.js, Expre
    PORT=3000
    ```
 
-3. Start the app:
+3. Start the app locally:
 
    ```bash
    npm run dev
    ```
 
-4. Open the dashboard in your browser:
+4. Run tests and linting:
+
+   ```bash
+   npm test
+   npm run lint
+   ```
+
+5. Open the dashboard in your browser:
 
    ```text
    http://localhost:3000
@@ -105,7 +114,6 @@ curl http://localhost:3000/api/insights
 ## Suggested improvements
 
 - Add user authentication and per-user data storage.
-- Add a real SMS webhook integration (e.g. Twilio) instead of manual POST ingestion.
 - Improve parser coverage for more banks and message formats.
 - Add date-range filtering, budgets, export/import, and transaction search.
 - Add tests for parser, routes, and analytics logic.

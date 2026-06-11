@@ -2,18 +2,33 @@
 
 const Transaction = require('../models/Transaction');
 
+const buildFilter = (query) => {
+  const filter = {};
+  if (query.sender) filter.sender = new RegExp(query.sender, 'i');
+  if (query.type) filter.type = query.type;
+  if (query.category) filter.category = query.category;
+  if (query.startDate || query.endDate) {
+    filter.date = {};
+    if (query.startDate) filter.date.$gte = new Date(query.startDate);
+    if (query.endDate) filter.date.$lte = new Date(query.endDate);
+  }
+  return filter;
+};
+
 /**
  * GET /api/insights
  * Returns aggregated analytics data for the frontend dashboard
  */
 const getInsights = async (req, res) => {
   try {
+    const filter = buildFilter(req.query);
 
     // ── 1. Total count ──────────────────────────────────────────────
-    const totalCount = await Transaction.countDocuments();
+    const totalCount = await Transaction.countDocuments(filter);
 
     // ── 2. Overall totals (debit / credit) ─────────────────────────
     const totalsAgg = await Transaction.aggregate([
+      { $match: filter },
       {
         $group: {
           _id: '$type',
@@ -38,7 +53,7 @@ const getInsights = async (req, res) => {
 
     // ── 3. Spending breakdown by category (debits only) ─────────────
     const bySpendCategory = await Transaction.aggregate([
-      { $match: { type: 'debit' } },
+      { $match: { ...filter, type: 'debit' } },
       {
         $group: {
           _id:   '$category',
@@ -54,11 +69,12 @@ const getInsights = async (req, res) => {
 
     // ── 5. Monthly trend (group by month) ───────────────────────────
     const monthly = await Transaction.aggregate([
+      { $match: filter },
       {
         $group: {
           _id: {
-            month: { $month: '$createdAt' },
-            year:  { $year:  '$createdAt' },
+            month: { $month: '$date' },
+            year:  { $year:  '$date' },
             type:  '$type',
           },
           total: { $sum: '$amount' },
@@ -70,6 +86,7 @@ const getInsights = async (req, res) => {
 
     // ── 6. Top senders ───────────────────────────────────────────────
     const topSenders = await Transaction.aggregate([
+      { $match: filter },
       {
         $group: {
           _id:   '$sender',
@@ -83,12 +100,12 @@ const getInsights = async (req, res) => {
 
     // ── 7. Highest single transactions ───────────────────────────────
     const highestDebit = await Transaction
-      .findOne({ type: 'debit' })
+      .findOne({ ...filter, type: 'debit' })
       .sort({ amount: -1 })
       .select('sender amount category date');
 
     const highestCredit = await Transaction
-      .findOne({ type: 'credit' })
+      .findOne({ ...filter, type: 'credit' })
       .sort({ amount: -1 })
       .select('sender amount category date');
 
